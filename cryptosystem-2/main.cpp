@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <vector>
 #include <algorithm>
+#include <string>
+#include <bitset>
 using namespace std;
 
 
@@ -133,30 +135,88 @@ bool isPrime(uint64_t n) {
 uint64_t randomPrime(uint64_t N) {
     if (N < 2) throw std::invalid_argument("No primes <= N");
 
-    static random_device rd;
-    static mt19937_64 gen(rd());
-    uniform_int_distribution<uint64_t> dist(2, N);
+    std::uniform_int_distribution<uint64_t> dist(2, N);
 
     while (true) {
-        uint64_t x = dist(gen);
+        uint64_t x = dist(RNG);
         if (isPrime(x)) return x;
     }
 }
 
+
 // End of functions to help generate large random prime number for a
 
+// Multiply a vector z by a large integer a, then reduce mod 2q
+std::vector<int64_t> multiplyAndMod(
+        const std::vector<int64_t>& z,
+        int64_t a,
+        int64_t q)
+{
+    int64_t mod = 2 * q;
+    std::vector<int64_t> result(z.size());
+
+    for (size_t i = 0; i < z.size(); i++) {
+        __int128 temp = (__int128)z[i] * a;   // safe 128-bit multiply
+        int64_t reduced = (int64_t)(temp % mod);
+        if (reduced < 0) reduced += mod;
+        result[i] = reduced;
+    }
+
+    return result;
+}
+// Generates error vector
+std::vector<double> randomVectorInRange(size_t dimension, double x) {
+    std::uniform_real_distribution<double> dist(-x, x);
+
+    std::vector<double> v(dimension);
+    for (size_t i = 0; i < dimension; i++) {
+        v[i] = dist(RNG);
+    }
+    return v;
+}
 
 
+//Makes a given string into binary
+std::vector<int> stringToBitVector(const std::string& input) {
+    std::vector<int> bits;
+    bits.reserve(input.size() * 8);
+
+    for (unsigned char c : input) {
+        for (int i = 7; i >= 0; i--) {
+            bits.push_back((c >> i) & 1);
+        }
+    }
+
+    return bits;
+}
+
+//Computes dot products
+double dotProduct(const std::vector<int64_t>& a,
+                  const std::vector<double>& b)
+{
+    if (a.size() != b.size()) {
+        throw std::invalid_argument("Vectors must have the same dimension");
+    }
+
+    double acc = 0.0;
+    for (size_t i = 0; i < a.size(); i++) {
+        acc += static_cast<double>(a[i]) * b[i];
+    }
+    return acc;
+}
+
+double nonZeroDot(const std::vector<int64_t>& a, double x) {
+    while (true) {
+        auto b = randomVectorInRange(a.size(), x);
+        double d = dotProduct(a, b);
+        if (d != 0.0) return d;
+    }
+}
 
 //Define big q, which is a very large prime number
 //Question: How big does it need to be?
 //A sample q is provided here
 const unsigned long long q = 1795265022;
-
-//Define the error range the vector can hold. Must be very small
-//Question: What is the maximum smallest size we can get?
-//Assumption: For now, 1/q is used as a placeholder
-const float error_range = (1/(double)q);
 
 //Define the dimension we are working in
 //Rows
@@ -164,6 +224,13 @@ int n = 359;
 //Columns
 int m = 2934;
 const unsigned int N = (m-n);
+
+//Define the error range the vector can hold. Must be very small
+//Question: What is the maximum smallest size we can get?
+//Assumption: For now, 1/q is used as a placeholder
+const double error_range = 1.0/(q);
+
+
 
 //Create a, which a random prime number from 1 to 2q-1
 //This is our public key
@@ -175,22 +242,20 @@ int main(int argc, const char * argv[]) {
     cout << "Big prime, q, is equal to: " << q << endl;
     cout << "The error interval is from -" << error_range << " to +" << error_range << endl;
     cout << "The dimension, N, is: " << N << endl;
-    cout << "The public key, a, is: " << a << endl << endl;
+    cout << "The random scalar, a, is: " << a << endl << endl;
 
     
    
     //Generate a short vector given m, n and q
-    cout << "SAP short vector generation: " << endl << endl;
-
-    SAPInstance inst = generateSAPInstance(n, m, 2*q);
-
-
+    cout << "Private key generation... " << endl << endl;
+    //Uncomment to see the matrix, short vector, and double checking process
+    /*
     std::cout << "Matrix A (mod " << inst.q << "):\n";
     for (auto &row : inst.A) {
         for (auto x : row) std::cout << x << " ";
         std::cout << "\n";
     }
-
+     
     std::cout << "\nShort solution z:\n";
     for (auto x : inst.z) std::cout << x << " ";
     std::cout << "\n";
@@ -203,8 +268,29 @@ int main(int argc, const char * argv[]) {
         std::cout << modq(sum, inst.q) << " ";
     }
     std::cout << "\n";
-   
+    */
     
+    SAPInstance s = generateSAPInstance(n, m, 2*q);
+    cout << "Public key generation... " << endl << endl;
+    
+    //Generates public key by multiply it by a and then wrapping it in mod q
+    auto as = multiplyAndMod(s.z, a, s.q);
+    
+    //Generates error vector and
+    //Calculate the dot product of as and error vector
+    uint64_t dot_product = nonZeroDot(as, error_range);
+    
+    cout << "The dot product between as and e is: " << dot_product << endl;
+    cout << "Now for the fun part, enter your message you wish to encrypt" << endl;
+    
+    string message;
+    getline(cin, message);
+    
+    
+    cout << "Converting message.." << endl;
+    
+    //Convert your message into binary
+    vector<int> bits = stringToBitVector(message);
     
     
     return 0;
