@@ -227,14 +227,14 @@ const unsigned int N = (m-n);
 
 //Define the error range the vector can hold. Must be very small
 //Question: What is the maximum smallest size we can get?
-//Assumption: For now, 1/q is used as a placeholder
-const double error_range = 1.0/(q);
+//Assumption: For now, 2 is used as a placeholder
+const double error_range = 1.0/q;
 
 
 
 //Create a, which a random prime number from 1 to 2q-1
 //This is our public key
-const unsigned long long a = randomPrime(2*q);
+const unsigned long long a = randomPrime( (2*q) - 1);
 
 
 int main(int argc, const char * argv[]) {
