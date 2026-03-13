@@ -205,18 +205,104 @@ double dotProduct(const std::vector<int64_t>& a,
     return acc;
 }
 
-double nonZeroDot(const std::vector<int64_t>& a, double x) {
-    while (true) {
-        auto b = randomVectorInRange(a.size(), x);
-        double d = dotProduct(a, b);
-        if (d != 0.0) return d;
+void printVector(const std::vector<double>& v) {
+    std::cout << "[ ";
+    for (size_t i = 0; i < v.size(); i++) {
+        std::cout << v[i];
+        if (i + 1 < v.size()) std::cout << ", ";
     }
+    std::cout << " ]\n";
 }
+void printVector(const std::vector<int>& v) {
+    std::cout << "[ ";
+    for (size_t i = 0; i < v.size(); i++) {
+        std::cout << v[i];
+        if (i + 1 < v.size()) std::cout << ", ";
+    }
+    std::cout << " ]\n";
+}
+
+std::vector<double> transformVector(
+        const std::vector<int>& bit_vector,
+        const std::vector<int64_t>& as_vector,
+        const std::vector<double>& error_vector,
+        uint64_t q)
+{
+    size_t n = bit_vector.size();
+    uint64_t mod = 2 * q;
+
+    std::vector<double> result(n);
+
+    for (size_t i = 0; i < n; i++) {
+
+        // Compute the raw value (fractional allowed)
+        double raw = static_cast<double>(as_vector[i]) * error_vector[i]
+                   + static_cast<double>(bit_vector[i]) * static_cast<double>(q);
+
+        // Wrap mod 2q (for doubles)
+        double wrapped = fmod(raw, static_cast<double>(mod));
+        if (wrapped < 0) wrapped += static_cast<double>(mod);
+
+        result[i] = wrapped;
+    }
+
+    return result;
+}
+
+#include <numeric> // for std::gcd
+
+std::vector<int> decryptVector(
+        const std::vector<double>& ciphertext,
+        uint64_t q)
+{
+    uint64_t mod = 2 * q;
+    std::vector<int> result(ciphertext.size());
+
+    for (size_t i = 0; i < ciphertext.size(); i++) {
+
+        // Wrap mod 2q
+        double wrapped = fmod(ciphertext[i], (double)mod);
+        if (wrapped < 0) wrapped += (double)mod;
+
+        // Scale down
+        double scaled = wrapped / (double)q;
+
+        // Decide bit
+        if (fabs(scaled - 0.0) < 0.50)
+            result[i] = 0;
+        else if (fabs(scaled - 1.0) < 0.50)
+            result[i] = 1;
+        else
+            result[i] = -1; // ambiguous / error
+    }
+
+    return result;
+}
+
+std::string bitVectorToString(const std::vector<int>& bits) {
+    std::string output;
+    size_t n = bits.size();
+
+    if (n % 8 != 0) {
+        throw std::runtime_error("Bit vector length is not a multiple of 8");
+    }
+
+    for (size_t i = 0; i < n; i += 8) {
+        unsigned char c = 0;
+        for (int b = 0; b < 8; b++) {
+            c = (c << 1) | (bits[i + b] & 1);
+        }
+        output.push_back(static_cast<char>(c));
+    }
+
+    return output;
+}
+
 
 //Define big q, which is a very large prime number
 //Question: How big does it need to be?
 //A sample q is provided here
-const unsigned long long q = 1795265022;
+const unsigned long long q = 32416190071;
 
 //Define the dimension we are working in
 //Rows
@@ -228,7 +314,7 @@ const unsigned int N = (m-n);
 //Define the error range the vector can hold. Must be very small
 //Question: What is the maximum smallest size we can get?
 //Assumption: For now, 2 is used as a placeholder
-const double error_range = 1.0/q;
+const double error_range = 1.0/(2*q*q);
 
 
 
@@ -274,13 +360,16 @@ int main(int argc, const char * argv[]) {
     cout << "Public key generation... " << endl << endl;
     
     //Generates public key by multiply it by a and then wrapping it in mod q
-    auto as = multiplyAndMod(s.z, a, s.q);
+    vector<int64_t> as = multiplyAndMod(s.z, a, s.q);
     
-    //Generates error vector and
-    //Calculate the dot product of as and error vector
-    uint64_t dot_product = nonZeroDot(as, error_range);
+    //Generates error vector
+    
+    vector<double> error_vector = randomVectorInRange(as.size(), error_range);
+    /*Calculate the dot product of as and error vector
+    double dot_product = dotProduct(as, error_vector);
     
     cout << "The dot product between as and e is: " << dot_product << endl;
+     */
     cout << "Now for the fun part, enter your message you wish to encrypt" << endl;
     
     string message;
@@ -291,7 +380,17 @@ int main(int argc, const char * argv[]) {
     
     //Convert your message into binary
     vector<int> bits = stringToBitVector(message);
+    cout << "Bits of your message: " << endl;
+    printVector(bits);
+    vector<double> encrypted = transformVector(bits, as, error_vector, q);
+    cout << "The encrypted message is.." << endl;
+    printVector(encrypted);
+    cout << "Unencrypt the bits" << endl;
+    vector<int> reveal_message = decryptVector(encrypted, q);
+    printVector(reveal_message);
     
-    
+    std::string recovered = bitVectorToString(reveal_message);
+    cout << "Recovered message: " << recovered << endl;
     return 0;
+    
 }
