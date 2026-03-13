@@ -190,20 +190,7 @@ std::vector<int> stringToBitVector(const std::string& input) {
     return bits;
 }
 
-//Computes dot products
-double dotProduct(const std::vector<int64_t>& a,
-                  const std::vector<double>& b)
-{
-    if (a.size() != b.size()) {
-        throw std::invalid_argument("Vectors must have the same dimension");
-    }
 
-    double acc = 0.0;
-    for (size_t i = 0; i < a.size(); i++) {
-        acc += static_cast<double>(a[i]) * b[i];
-    }
-    return acc;
-}
 
 void printVector(const std::vector<double>& v) {
     std::cout << "[ ";
@@ -313,8 +300,8 @@ const unsigned int N = (m-n);
 
 //Define the error range the vector can hold. Must be very small
 //Question: What is the maximum smallest size we can get?
-//Assumption: For now, 2 is used as a placeholder
-const double error_range = 1.0/(2*q*q);
+//Assumption: For now, 1/q^2 is used as a placeholder
+const double error_range = 1.0/(q*q);
 
 
 
@@ -365,11 +352,7 @@ int main(int argc, const char * argv[]) {
     //Generates error vector
     
     vector<double> error_vector = randomVectorInRange(as.size(), error_range);
-    /*Calculate the dot product of as and error vector
-    double dot_product = dotProduct(as, error_vector);
-    
-    cout << "The dot product between as and e is: " << dot_product << endl;
-     */
+
     cout << "Now for the fun part, enter your message you wish to encrypt" << endl;
     
     string message;
